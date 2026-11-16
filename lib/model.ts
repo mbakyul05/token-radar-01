@@ -22,6 +22,8 @@
 // special-cased, and the same function scores every row. The dashboard recomputes a row from the
 // same figures and shows the category multiple and peer count beside it.
 
+import { buildSensitivity, type SensitivitySummary } from './sensitivity.ts';
+
 /** The snapshot's protocol entry: exactly the ten fields the sealed input carries. */
 export interface SnapshotProtocol {
   slug: string;
@@ -165,6 +167,8 @@ export interface RadarData {
   live_size: number;
   rows: RadarRow[];
   live: LiveRow[];
+  /** The board repriced under cold, hot and flat markets, with concentration and readiness. */
+  sensitivity: SensitivitySummary;
 }
 
 /** Why the snapshot is not one this model can score. */
@@ -498,6 +502,7 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
   const live = liveRows(snapshot);
   const { global, peers } = peerMultiples(snapshot, model);
   const early = board.filter((r) => !snapshot.watchlist.includes(r.slug)).length;
+  const sensitivity = buildSensitivity(board);
   const radar: RadarData = {
     as_of: snapshot.as_of,
     source: snapshot.source,
@@ -512,6 +517,7 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     live_size: live.length,
     rows: board.map(radarRow),
     live,
+    sensitivity,
   };
   return { board, radar };
 }

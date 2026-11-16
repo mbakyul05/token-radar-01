@@ -314,6 +314,89 @@
     );
   }
 
+  function pctShare(x) {
+    if (x === null || x === undefined || !isFinite(x)) return 'n/a';
+    return (x * 100).toFixed(1) + '%';
+  }
+  function scenarioTable() {
+    var sens = DATA.sensitivity;
+    if (!sens) return null;
+    var body = el('tbody');
+    sens.categories.forEach(function (c) {
+      body.appendChild(el('tr', null,
+        el('td', null, el('b', { text: c.category })),
+        el('td', { class: 'num', text: String(c.rows) }),
+        el('td', { class: 'num', text: fmtUsd(c.bear) }),
+        el('td', { class: 'num', text: fmtUsd(c.base) }),
+        el('td', { class: 'num', text: fmtUsd(c.bull) }),
+        el('td', { class: 'num', text: fmtUsd(c.flat) }),
+        el('td', null, el('span', { class: 'sub', text: c.topName + ' (' + pctShare(c.topShare) + ')' }))
+      ));
+    });
+    return el('div', { class: 'table-wrap' },
+      el('table', { class: 'peers' },
+        el('thead', null, el('tr', null,
+          el('th', { scope: 'col', text: 'Category' }),
+          el('th', { scope: 'col', text: 'Rows' }),
+          el('th', { scope: 'col', text: 'Cold market' }),
+          el('th', { scope: 'col', text: 'Board value' }),
+          el('th', { scope: 'col', text: 'Hot market' }),
+          el('th', { scope: 'col', text: 'Flat growth' }),
+          el('th', { scope: 'col', text: 'Carried by' })
+        )),
+        body
+      )
+    );
+  }
+  function readinessListEl() {
+    var sens = DATA.sensitivity;
+    if (!sens) return null;
+    var items = sens.readiness.map(function (r, i) {
+      return el('li', null,
+        el('b', { text: (i + 1) + '. ' + r.name }),
+        el('span', { class: 'sub', text: ' ' + r.score + ' / 100, ' + r.band + ', implied ' + fmtUsd(r.implied) })
+      );
+    });
+    return el('ol', { class: 'steps' }, items);
+  }
+  function rangeListEl(rows, note) {
+    var items = (rows || []).map(function (r, i) {
+      return el('li', null,
+        el('b', { text: (i + 1) + '. ' + r.name }),
+        el('span', { class: 'sub', text: ' cold ' + fmtUsd(r.bear) + ', board ' + fmtUsd(r.base) + ', hot ' + fmtUsd(r.bull) + ', swing ' + fmtUsd(r.spread) })
+      );
+    });
+    return el('div', null,
+      el('p', { class: 'sub', text: note }),
+      el('ol', { class: 'steps' }, items)
+    );
+  }
+  function sensitivityPanel() {
+    var sens = DATA.sensitivity;
+    if (!sens) return null;
+    var t = sens.totals;
+    var conc = sens.concentration;
+    return el('section', { class: 'panel model' },
+      el('h2', { text: 'What the board is worth in other markets' }),
+      el('p', { class: 'sub', text: 'The board is one number per protocol, priced at today’s peer multiples. These are the same rows repriced three other ways: every multiple halved for a cold market, doubled for a hot one, and growth ignored for a flat one. A category whose hot number is far above its cold one is a bet on the market staying generous.' }),
+      el('div', { class: 'facts' },
+        el('div', { class: 'fact' }, el('span', { text: 'Cold market' }), el('b', { text: fmtUsd(t.bear) })),
+        el('div', { class: 'fact' }, el('span', { text: 'Board value' }), el('b', { text: fmtUsd(t.base) })),
+        el('div', { class: 'fact' }, el('span', { text: 'Hot market' }), el('b', { text: fmtUsd(t.bull) })),
+        el('div', { class: 'fact' }, el('span', { text: 'Flat growth' }), el('b', { text: fmtUsd(t.flat) }))
+      ),
+      scenarioTable(),
+      el('p', { class: 'sub', text: 'Concentration: the three biggest rows hold ' + pctShare(conc.topThreeShare) + ' of the board, and the single biggest, ' + conc.biggestName + ', holds ' + pctShare(conc.biggestShare) + '. The Herfindahl index is ' + conc.herfindahl.toFixed(3) + ' — near 0 means the value is spread out, near 1 means one launch is the board.' }),
+      el('h3', { text: 'Most ready to launch' }),
+      el('p', { class: 'sub', text: 'Readiness scores size, age and recent growth out of 100. Ready is 80 and above, warming is 60 and above, early is below that. It is a sorting aid, not a prediction.' }),
+      readinessListEl(),
+      el('h3', { text: 'Widest swings' }),
+      rangeListEl(sens.mostSensitive, 'These rows move furthest from a cold market to a hot one: their worth is mostly the market’s mood, so a repricing moves them more than their neighbours.'),
+      el('h3', { text: 'Leaning on the last seven days' }),
+      rangeListEl(sens.growthExposed, 'These rows lean hardest on recent growth: the swing is the distance between the board’s number and the flat-growth number. A row far above its flat value is riding a hot week.')
+    );
+  }
+
   var dialog = el('dialog', { class: 'detail', id: 'detail', 'aria-labelledby': 'detail-title' });
   dialog.addEventListener('close', function () { state.selected = null; writeHash(); });
 
@@ -369,6 +452,10 @@
     shell.appendChild(controls());
     shell.appendChild(state.tab === 'pre-token' ? boardTable() : liveTable());
     if (state.tab === 'pre-token') shell.appendChild(modelPanel());
+    if (state.tab === 'pre-token') {
+      var sens = sensitivityPanel();
+      if (sens) shell.appendChild(sens);
+    }
     app.appendChild(shell);
     app.setAttribute('aria-busy', 'false');
     if (!dialog.isConnected) app.appendChild(dialog);
