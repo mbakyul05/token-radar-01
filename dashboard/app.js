@@ -387,6 +387,34 @@
       ),
       scenarioTable(),
       el('p', { class: 'sub', text: 'Concentration: the three biggest rows hold ' + pctShare(conc.topThreeShare) + ' of the board, and the single biggest, ' + conc.biggestName + ', holds ' + pctShare(conc.biggestShare) + '. The Herfindahl index is ' + conc.herfindahl.toFixed(3) + ' — near 0 means the value is spread out, near 1 means one launch is the board.' }),
+      el('h3', { text: 'Steady money and market bets' }),
+      el('p', { class: 'sub', text: 'Each row is sorted by how far it swings from a cold market to a hot one, judged against its own value. Stable rows move under a quarter, moderate rows up to double, volatile rows more than double.' }),
+      (function () {
+        var bandBody = el('tbody');
+        (sens.bands || []).forEach(function (b) {
+          bandBody.appendChild(el('tr', null,
+            el('td', null, el('b', { text: b.band })),
+            el('td', { class: 'num', text: String(b.rows) }),
+            el('td', { class: 'num', text: fmtUsd(b.bear) }),
+            el('td', { class: 'num', text: fmtUsd(b.base) }),
+            el('td', { class: 'num', text: fmtUsd(b.bull) }),
+            el('td', { class: 'num', text: pctShare(b.share) })
+          ));
+        });
+        return el('div', { class: 'table-wrap' },
+          el('table', { class: 'peers' },
+            el('thead', null, el('tr', null,
+              el('th', { scope: 'col', text: 'Swing band' }),
+              el('th', { scope: 'col', text: 'Rows' }),
+              el('th', { scope: 'col', text: 'Cold market' }),
+              el('th', { scope: 'col', text: 'Board value' }),
+              el('th', { scope: 'col', text: 'Hot market' }),
+              el('th', { scope: 'col', text: 'Share' })
+            )),
+            bandBody
+          )
+        );
+      })(),
       el('h3', { text: 'Most ready to launch' }),
       el('p', { class: 'sub', text: 'Readiness scores size, age and recent growth out of 100. Ready is 80 and above, warming is 60 and above, early is below that. It is a sorting aid, not a prediction.' }),
       readinessListEl(),

@@ -73,6 +73,22 @@ export interface SensitivityRange {
   spread: number;
 }
 
+/** One swing band: the rows whose value moves by a similar share across the markets. */
+export interface SwingBand {
+  /** 'stable' under a quarter's swing, 'moderate' under a doubling, 'volatile' above it. */
+  band: 'stable' | 'moderate' | 'volatile';
+  /** How many rows fall in the band. */
+  rows: number;
+  /** The band's base total. */
+  base: number;
+  /** The band's cold-market total. */
+  bear: number;
+  /** The band's hot-market total. */
+  bull: number;
+  /** The band's share of the board's base total, 0..1. */
+  share: number;
+}
+
 /** One protocol's launch readiness: a score out of 100 and the band it falls in. */
 export interface ReadinessEntry {
   slug: string;
@@ -99,6 +115,8 @@ export interface SensitivitySummary {
   mostSensitive: SensitivityRange[];
   /** The ten rows whose value leans hardest on the last seven days' growth. */
   growthExposed: SensitivityRange[];
+  /** The board split into stable, moderate and volatile rows by their cold-to-hot swing. */
+  bands: SwingBand[];
 }
 
 /** The cold market's factor and the hot market's factor, applied to the peer multiple. */
@@ -300,6 +318,61 @@ export function growthExposedRows(board: BoardRow[], count = 10): SensitivityRan
   return ranged.slice(0, count);
 }
 
+/**
+ * The band a row's cold-to-hot swing puts it in. The swing is measured against the
+ * row's own base value, so a small row and a big row are judged on the same scale: a
+ * row that doubles or more when the market turns hot is volatile whatever its size,
+ * and one that barely moves is stable whatever its size.
+ */
+export function swingBandOf(row: BoardRow): SwingBand['band'] {
+  const priced = rowScenarios(row);
+  if (priced.base <= 0) return 'stable';
+  const swing = (priced.bull - priced.bear) / priced.base;
+  if (swing < 0.25) return 'stable';
+  if (swing <= 1) return 'moderate';
+  return 'volatile';
+}
+
+/**
+ * The board split into swing bands. Each band carries its rows, its base total and
+ * its cold and hot totals, so the dashboard can say how much of the board is steady
+ * money and how much is a bet on the market staying generous.
+ */
+export function swingBands(board: BoardRow[]): SwingBand[] {
+  const totals: ScenarioValues = { bear: 0, base: 0, bull: 0, flat: 0 };
+  for (const row of board) {
+    const priced = rowScenarios(row);
+    totals.bear += priced.bear;
+    totals.base += priced.base;
+    totals.bull += priced.bull;
+    totals.flat += priced.flat;
+  }
+  const bands: SwingBand[] = [];
+  for (const band of ['stable', 'moderate', 'volatile'] as const) {
+    let rows = 0;
+    let bear = 0;
+    let base = 0;
+    let bull = 0;
+    for (const row of board) {
+      if (swingBandOf(row) !== band) continue;
+      const priced = rowScenarios(row);
+      rows += 1;
+      bear += priced.bear;
+      base += priced.base;
+      bull += priced.bull;
+    }
+    bands.push({
+      band,
+      rows,
+      base,
+      bear,
+      bull,
+      share: totals.base > 0 ? base / totals.base : 0,
+    });
+  }
+  return bands;
+}
+
 /** The whole sensitivity summary for a board: totals, categories, concentration, readiness. */
 export function buildSensitivity(board: BoardRow[]): SensitivitySummary {
   const totals: ScenarioValues = { bear: 0, base: 0, bull: 0, flat: 0 };
@@ -317,5 +390,6 @@ export function buildSensitivity(board: BoardRow[]): SensitivitySummary {
     readiness: readinessList(board),
     mostSensitive: mostSensitiveRows(board),
     growthExposed: growthExposedRows(board),
+    bands: swingBands(board),
   };
 }
